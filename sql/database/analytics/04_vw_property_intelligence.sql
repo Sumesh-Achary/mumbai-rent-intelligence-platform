@@ -1,0 +1,46 @@
+/*
+===============================================================================
+Script Name : 04_vw_Property_Intelligence.sql
+Project     : Mumbai Rent Intelligence Platform
+
+Purpose:
+Creates a reusable business view containing property-level rental intelligence
+for Power BI dashboards and business reporting.
+===============================================================================
+*/
+
+DROP VIEW IF EXISTS analytics.vw_property_intelligence;
+
+CREATE VIEW analytics.vw_property_intelligence AS
+SELECT
+    dp.bhk,
+    dp.bathroom,
+    dp.furnishing,
+    dp.property_type,
+    dp.property_age_category,
+    COUNT(*) AS total_properties,
+    ROUND(AVG(fr.rent),2) AS average_rent,
+    MIN(fr.rent) AS minimum_rent,
+    MAX(fr.rent) AS maximum_rent,
+    ROUND(AVG(fr.rent_per_sqft),2) AS average_rent_per_sqft,
+    ROUND(AVG(fr.carpet_area_sqft),2) AS average_carpet_area,
+    CASE
+        WHEN COUNT(*) < 5 THEN 'Low'
+        WHEN COUNT(*) BETWEEN 5 AND 15 THEN 'Medium'
+        ELSE 'High'
+    END AS confidence_level
+FROM core.fact_rent fr
+JOIN core.dim_property dp
+ON fr.property_key = dp.property_key
+GROUP BY
+    dp.bhk,
+    dp.bathroom,
+    dp.furnishing,
+    dp.property_type,
+    dp.property_age_category;
+
+
+SELECT *
+FROM analytics.vw_property_intelligence
+ORDER BY bhk, furnishing;
+
