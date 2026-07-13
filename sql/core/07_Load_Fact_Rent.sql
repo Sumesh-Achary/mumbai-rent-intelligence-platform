@@ -19,7 +19,8 @@ INSERT INTO core.fact_rent
     carpet_area_sqft,
     rent_per_sqft,
     rent_annual,
-    property_age_years
+    property_age_years,
+    affordabili
 )
 
 SELECT
@@ -42,7 +43,9 @@ SELECT
 
     s.rent_annual,
 
-    s.property_age_years
+    s.property_age_years,
+
+    s.affordability_ratio
 
 FROM staging.rent_raw s
 
@@ -63,3 +66,12 @@ INNER JOIN core.dim_property dp
 INNER JOIN core.dim_date dd
     ON s.posted_date = dd.full_date;
 
+
+SELECT *
+FROM staging.rent_raw
+LIMIT 1;
+
+SELECT column_name
+FROM information_schema.columns
+WHERE table_schema='staging'
+AND table_name='rent_raw';

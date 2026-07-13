@@ -32,8 +32,6 @@ CREATE TABLE core.fact_rent
 
     property_age_years NUMERIC(5,2),
 
-    affordability_ratio NUMERIC(8,2),
-
     CONSTRAINT fk_fact_source
         FOREIGN KEY (source_key)
         REFERENCES core.dim_source(source_key),
