@@ -6,10 +6,11 @@ Project     : Mumbai Rent Intelligence Platform
 Purpose:
 Creates the Business Metrics View used by Power BI.
 
-Version : 1.1
+Version : 2.1 (Production)
 
-Business Metric Included
+Business Metrics Included
 1. MRVI - Mumbai Rental Value Index
+2. MPS  - Market Position Score
 ===============================================================================
 */
 
@@ -35,10 +36,11 @@ WITH base_metrics AS
 
     FROM core.fact_rent fr
 
-    JOIN core.dim_locality dl
+    INNER JOIN core.dim_locality dl
         ON fr.locality_key = dl.locality_key
 
-    GROUP BY dl.locality
+    GROUP BY
+        dl.locality
 ),
 
 /*=============================================================================
@@ -85,7 +87,7 @@ benchmark_metrics AS
                     cb.mumbai_average_rent_per_sqft
                 )
                 /
-                cb.mumbai_average_rent_per_sqft
+                NULLIF(cb.mumbai_average_rent_per_sqft,0)
             ) * 100,
             2
         ) AS pricing_difference_pct
@@ -97,8 +99,9 @@ benchmark_metrics AS
 
 /*=============================================================================
 STEP 4 : MRVI SCORE
+
 Higher Score = Better Rental Value
-(Lower Rent/SqFt gets Higher Score)
+Lower Rent/SqFt = Higher Score
 =============================================================================*/
 
 mrvi_metrics AS
@@ -135,6 +138,67 @@ mrvi_metrics AS
         ) AS mrvi_score
 
     FROM benchmark_metrics
+),
+
+/*=============================================================================
+STEP 5 : MARKET POSITION SCORE (MPS)
+
+Weighting:
+70% = Average Rent
+30% = Average Rent/SqFt
+
+Higher Score = Better Overall Market Position
+=============================================================================*/
+
+mps_metrics AS
+(
+    SELECT
+
+        locality,
+
+        average_rent,
+
+        average_rent_per_sqft,
+
+        average_carpet_area,
+
+        mumbai_average_rent,
+
+        mumbai_average_rent_per_sqft,
+
+        pricing_difference_pct,
+
+        mrvi_score,
+
+        ROUND
+        (
+            (
+                (
+                    100
+                    -
+                    (
+                        PERCENT_RANK() OVER
+                        (
+                            ORDER BY average_rent ASC
+                        ) * 100
+                    )
+                ) * 0.70
+                +
+                (
+                    100
+                    -
+                    (
+                        PERCENT_RANK() OVER
+                        (
+                            ORDER BY average_rent_per_sqft ASC
+                        ) * 100
+                    )
+                ) * 0.30
+            )::NUMERIC,
+            2
+        ) AS mps_score
+
+    FROM mrvi_metrics
 )
 
 /*=============================================================================
@@ -171,16 +235,63 @@ SELECT
 
         ELSE 'Premium Cost Market'
 
-    END AS mrvi_category
+    END AS mrvi_category,
 
-FROM mrvi_metrics;
+    mps_score,
 
+    CASE
+
+        WHEN mps_score >= 85 THEN 'Excellent'
+
+        WHEN mps_score >= 70 THEN 'High'
+
+        WHEN mps_score >= 55 THEN 'Moderate'
+
+        WHEN mps_score >= 40 THEN 'Limited'
+
+        ELSE 'Premium'
+
+    END AS mps_category
+
+FROM mps_metrics;
+
+
+/*=============================================================================
+VALIDATION QUERY
+=============================================================================*/
 
 SELECT
+
     locality,
+
+    average_rent,
+
     average_rent_per_sqft,
+
+    average_carpet_area,
+
+    mumbai_average_rent,
+
+    mumbai_average_rent_per_sqft,
+
     pricing_difference_pct,
+
     mrvi_score,
-    mrvi_category
+
+    mrvi_category,
+
+    mps_score,
+
+    mps_category
+
 FROM analytics.vw_business_metrics
-ORDER BY mrvi_score DESC;
+
+ORDER BY
+
+    mrvi_score DESC,
+
+    mps_score DESC,
+
+    locality;
+
+
